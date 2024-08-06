@@ -34,7 +34,7 @@ app.get('/api/content', (req, res) => {
     try {
         const data = fs.readFileSync('data.json', 'utf-8');
         const parsedData = JSON.parse(data);
-        res.json(parsedData); // 修正了这里的括号和方法
+        res.json(parsedData);
     } catch (error) {
         res.json({ accounts: [], password: '' });
     }

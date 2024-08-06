@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理面板</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>管理面板</h1>
+        <form id="loginForm">
+            <label for="username">用户名:</label>
+            <input type="text" id="username" name="username" required>
+            <label for="password">密码:</label>
+            <input type="password" id="password" name="password" required>
+            <button type="submit">登录</button>
+        </form>
+        <form id="adminForm" style="display:none;">
+            <div id="accountContainer">
+                <!-- 动态添加账号密码输入区域 -->
+            </div>
+            <button type="button" id="addAccountButton">添加账号</button>
+            <button type="submit">生成提取码</button>
+            <button type="button" id="deleteAccountButton">删除选中账号</button>
+        </form>
+        <div id="message"></div>
+        <div id="passwordDisplay" style="display:none;">
+            <p>生成的提取码: <span id="generatedPassword"></span> <button id="copyPasswordButton">复制提取码</button></p>
+        </div>
+    </div>
+    <script>
+        let accountCount = 0;
+
+        async function loadContent() {
+            const response = await fetch('/api/content');
+            const data = await response.json();
+            if (data.accounts) {
+                data.accounts.forEach((account, index) => {
+                    addAccountFields(account.contentLeft, account.contentRight, account.description, index);
+                });
+                document.getElementById('generatedPassword').textContent = data.password;
+                document.getElementById('passwordDisplay').style.display = 'block';
+            }
+        }
+
+        function addAccountFields(contentLeft = '', contentRight = '', description = '', index = accountCount) {
+            const accountContainer = document.getElementById('accountContainer');
+            const accountDiv = document.createElement('div');
+            accountDiv.classList.add('account');
+            accountDiv.innerHTML = `
+                <div class="form-row">
+                    <span>${index + 1}.</span>
+                    <input type="checkbox" class="deleteCheckbox" data-index="${index}">
+                    <label for="contentLeft${index}">账号:</label>
+                    <textarea id="contentLeft${index}" name="contentLeft" rows="2" cols="30">${contentLeft}</textarea>
+                </div>
+                <div class="form-row">
+                    <label for="contentRight${index}">密码:</label>
+                    <textarea id="contentRight${index}" name="contentRight" rows="2" cols="30">${contentRight}</textarea>
+                </div>
+                <div class="form-row">
+                    <label for="description${index}">说明:</label>
+                    <textarea id="description${index}" name="description" rows="2" cols="30">${description}</textarea>
+                </div>`;
+            accountContainer.appendChild(accountDiv);
+            accountCount++;
+        }
+
+        document.getElementById('addAccountButton').addEventListener('click', () => addAccountFields());
+
+        document.getElementById('deleteAccountButton').addEventListener('click', () => {
+            const checkboxes = document.querySelectorAll('.deleteCheckbox:checked');
+            checkboxes.forEach(checkbox => {
+                const index = checkbox.getAttribute('data-index');
+                const accountDiv = document.querySelector(`[data-index="${index}"]`).closest('.account');
+                accountDiv.remove();
+            });
+        });
+
+        document.getElementById('copyPasswordButton').addEventListener('click', () => {
+            const password = document.getElementById('generatedPassword').textContent;
+            navigator.clipboard.writeText(password).then(() => {
+                alert('提取码已复制');
+            });
+        });
+
+        document.getElementById('loginForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            const response = await fetch('/api/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ username, password }),
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                document.getElementById('loginForm').style.display = 'none';
+                document.getElementById('adminForm').style.display = 'block';
+                loadContent();
+            } else {
+                document.getElementById('message').textContent = data.message;
+            }
+        });
+
+        document.getElementById('adminForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const accounts = [];
+            document.querySelectorAll('.account').forEach((accountDiv, index) => {
+                const contentLeft = document.getElementById(`contentLeft${index}`).value;
+                const contentRight = document.getElementById(`contentRight${index}`).value;
+                const description = document.getElementById(`description${index}`).value;
+                accounts.push({ contentLeft, contentRight, description });
+            });
+
+            const response = await fetch('/api/admin', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ accounts }),
+            });
+
+            const data = await response.json();
+            document.getElementById('message').textContent = '提取码已刷新！';
+            document.getElementById('generatedPassword').textContent = data.password;
+            document.getElementById('passwordDisplay').style.display = 'block';
+        });
+    </script>
+</body>
+</html>
